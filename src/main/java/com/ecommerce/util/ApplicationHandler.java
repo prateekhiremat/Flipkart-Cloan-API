@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.ecommerce.exception.InvalidOtpException;
+import com.ecommerce.exception.OTPExpiredException;
+import com.ecommerce.exception.RegistrationExpiredException;
+
 @RestControllerAdvice
 public class ApplicationHandler extends ResponseEntityExceptionHandler {
 	private ResponseEntity<Object> structure (HttpStatus status,String message,Object rootCause){
@@ -40,4 +44,17 @@ public class ApplicationHandler extends ResponseEntityExceptionHandler {
 	public ResponseEntity<Object> handlerIllegalArgument(IllegalArgumentException ex){
 		return structure(HttpStatus.BAD_REQUEST,ex.getMessage(),"Request Not Applicable");
 	}
+	@ExceptionHandler (InvalidOtpException.class)
+	public ResponseEntity<Object> handlerInvalidOtp(InvalidOtpException ex){
+		return structure(HttpStatus.BAD_REQUEST,ex.getMessage(),"OTP does not match");
+	}
+	@ExceptionHandler (OTPExpiredException.class)
+	public ResponseEntity<Object> handlerOTPExpired(OTPExpiredException ex){
+		return structure(HttpStatus.BAD_REQUEST,ex.getMessage(),"Otp time out");
+	}
+	@ExceptionHandler (RegistrationExpiredException.class)
+	public ResponseEntity<Object> handlerRegistrationExpired(RegistrationExpiredException ex){
+		return structure(HttpStatus.BAD_REQUEST,ex.getMessage(),"User time out");
+	}
+	
 }
