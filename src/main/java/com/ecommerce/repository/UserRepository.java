@@ -16,5 +16,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 	List<Optional<User>> findByIsEmailVarified(boolean b);
 	
 	List<Optional<User>> findByIsDeleated(boolean b);
+
+	Boolean existsByEmail(String email);
 	
 }

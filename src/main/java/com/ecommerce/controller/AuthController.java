@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ecommerce.requestDTO.OtpModel;
 import com.ecommerce.requestDTO.UserRequest;
 import com.ecommerce.responseDTO.UserResponse;
 import com.ecommerce.service.AuthService;
@@ -19,26 +20,33 @@ import com.ecommerce.util.ResponseStructure;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 
+//kpiy himm hbgp rteo
+
 @RestController
 @RequestMapping
 @AllArgsConstructor
 public class AuthController {
+	
 	@Autowired
 	private AuthService authservice;
+	
 	@PostMapping("/registration/user")
 	public ResponseEntity<ResponseStructure<UserResponse>> registerUser(@RequestBody @Valid UserRequest userRequest){
 		return authservice.registerUser(userRequest);
 	}
-	@DeleteMapping("users/{userId}")
+	
+	@DeleteMapping("/users/{userId}")
 	public ResponseEntity<ResponseStructure<UserResponse>> deleteById(@PathVariable int userId){
 		return authservice.deleteById(userId);
 	}
-	@PutMapping("users/{userId}")
-	public ResponseEntity<ResponseStructure<UserResponse>> updateById(@PathVariable int userId, @RequestBody @Valid UserRequest userRequest){
-		return authservice.updateById(userId, userRequest);
-	}
-	@GetMapping("users/{userId}")
+	
+	@GetMapping("/users/{userId}")
 	public ResponseEntity<ResponseStructure<UserResponse>> fetchById(@PathVariable int userId){
 		return authservice.fetchById(userId);
+	}
+	
+	@PutMapping("/user/otp")
+	public ResponseEntity<ResponseStructure<UserResponse>> verifyOTP(@RequestBody  OtpModel otp){
+		return authservice.verifyOTP(otp);
 	}
 }
