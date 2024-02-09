@@ -1,5 +1,7 @@
 package com.ecommerce.entity;
 
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
 import com.ecommerce.Enum.UserRole;
@@ -13,6 +15,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.criteria.Predicate.BooleanOperator;
 import lombok.AllArgsConstructor;
@@ -45,4 +48,10 @@ public class User {
 	private UserRole userRole;
 	private boolean isEmailVarified;
 	private boolean isDeleated;
+	
+	@OneToMany
+	private List<AccessTocken> accessTockens;
+	
+	@OneToMany
+	private List<RefreshTocken> refreshTockens;
 }

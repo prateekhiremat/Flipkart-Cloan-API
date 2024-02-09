@@ -14,8 +14,8 @@ import lombok.AllArgsConstructor;
 public class ScheduledJobes {
 	@Autowired
 	private UserRepository userRepository;
-//	@Scheduled(fixedDelay = 1000L*60)
-//	@Transactional
+	@Scheduled(fixedDelay = 1000L*60)
+	@Transactional
 	public void delete() {
 		userRepository.findByIsDeleated(true).forEach(user -> {
 				userRepository.delete(user.get());
