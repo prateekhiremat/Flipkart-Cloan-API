@@ -1,56 +1,109 @@
 package com.ecommerce.serviceImpl;
 
+import java.time.LocalDateTime;
 import java.util.Date;
+import java.util.Optional;
 import java.util.Random;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.ecommerce.cache.CacheStore;
+import com.ecommerce.entity.AccessTocken;
 import com.ecommerce.entity.Customer;
+import com.ecommerce.entity.RefreshTocken;
 import com.ecommerce.entity.Seller;
 import com.ecommerce.entity.User;
 import com.ecommerce.exception.InvalidOtpException;
 import com.ecommerce.exception.OTPExpiredException;
 import com.ecommerce.exception.RegistrationExpiredException;
+import com.ecommerce.repository.AccessTockenRepository;
+import com.ecommerce.repository.RefreshTockenRepository;
 import com.ecommerce.repository.UserRepository;
+import com.ecommerce.requestDTO.AuthRequest;
 import com.ecommerce.requestDTO.MessageStructure;
 import com.ecommerce.requestDTO.OtpModel;
 import com.ecommerce.requestDTO.UserRequest;
+import com.ecommerce.responseDTO.AuthResponse;
 import com.ecommerce.responseDTO.UserResponse;
+import com.ecommerce.security.JwtService;
 import com.ecommerce.service.AuthService;
+import com.ecommerce.util.CookieManager;
 import com.ecommerce.util.ResponseStructure;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
+//@AllArgsConstructor
 public class AuthServiceImpl implements AuthService {
 	
-	@Autowired
 	private UserRepository userRepository;
-	@Autowired
-	private CacheStore<String> cacheStore;
-	@Autowired
+	private CacheStore<String> otpCacheStore;
 	private CacheStore<User> userCacheStore;
-	@Autowired
 	private JavaMailSender javaMailSender;
+	private AuthenticationManager authenticationManager;
+	private CookieManager cookieManager;
+	private JwtService jwtService;
+	private AccessTockenRepository accessTockenRepository;
+	private RefreshTockenRepository refreshTockenRepository;
+	private ResponseStructure<AuthResponse> authStructure;
+	private PasswordEncoder passwordEncoder;
 	
+	@Value("${myapp.access.expiry}")
+	private int accessExpieryInSeconds;
+	
+	@Value("${myapp.refresh.expiry}")
+	private int refreshExpieryInSeconds;
+	
+	
+	public AuthServiceImpl(UserRepository userRepository, 
+			CacheStore<String> cacheStore,
+			CacheStore<User> userCacheStore, 
+			JavaMailSender javaMailSender, 
+			AuthenticationManager authenticationManager,
+			CookieManager cookieManager, 
+			JwtService jwtService, 
+			AccessTockenRepository accessTockenRepository, 
+			RefreshTockenRepository refreshTockenRepository, 
+			ResponseStructure<AuthResponse> authStructure, 
+			PasswordEncoder passwordEncoder) {
+		super();
+		this.userRepository = userRepository;
+		this.otpCacheStore = cacheStore;
+		this.userCacheStore = userCacheStore;
+		this.javaMailSender = javaMailSender;
+		this.authenticationManager = authenticationManager;
+		this.cookieManager = cookieManager;
+		this.jwtService = jwtService;
+		this.accessTockenRepository = accessTockenRepository;
+		this.refreshTockenRepository = refreshTockenRepository;
+		this.authStructure = authStructure;
+		this.passwordEncoder = passwordEncoder;
+	}
+
 	@Override
 	public ResponseEntity<ResponseStructure<UserResponse>> registerUser(@Valid UserRequest userRequest) {
 		if(userRepository.existsByEmail(userRequest.getEmail())) throw new IllegalArgumentException("User already exists by given email Id");
 
 		String otp = getOtp();
 		User user = mapToUser(userRequest);
-		cacheStore.add(userRequest.getEmail(), otp);
+		otpCacheStore.add(userRequest.getEmail(), otp);
 		userCacheStore.add(userRequest.getEmail(), user);
 		
 		try {
@@ -97,7 +150,7 @@ public class AuthServiceImpl implements AuthService {
 	@Override
 	public ResponseEntity<ResponseStructure<UserResponse>> verifyOTP(OtpModel otpModel) {
 		User user = userCacheStore.get(otpModel.getEmail());
-		String otp = cacheStore.get(otpModel.getEmail());
+		String otp = otpCacheStore.get(otpModel.getEmail());
 
 		if(otp==null) throw new OTPExpiredException("otp expired");
 		if(user==null) throw new RegistrationExpiredException("registration expired");
@@ -122,7 +175,52 @@ public class AuthServiceImpl implements AuthService {
 			throw new InvalidOtpException("invalid otp");
 	}
 	
-	public void sendOtpToMail(User user, String otp) throws MessagingException {
+	@Override
+	public ResponseEntity<ResponseStructure<AuthResponse>> login(AuthRequest authRequest, HttpServletResponse response) {
+		String userName = authRequest.getEmail().split("@")[0];
+		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(userName, authRequest.getPassword());
+		Authentication authentication = authenticationManager.authenticate(token);
+		if(!authentication.isAuthenticated()) throw new UsernameNotFoundException("Faild to Authenticate the user");
+		else
+			return userRepository.findByUserName(userName).map(user -> {
+				grantAccess(response, user);
+				return ResponseEntity.ok(authStructure.setStatus(HttpStatus.OK.value())
+						.setData(AuthResponse.builder()
+								.userId(user.getUserId())
+								.userName(userName)
+								.role(user.getUserRole().name())
+								.isAuthenticated(true)
+								.accessExpiration(LocalDateTime.now().plusSeconds(accessExpieryInSeconds))
+								.refreshExpiration(LocalDateTime.now().plusSeconds(refreshExpieryInSeconds))
+								.build())
+						.setMessage("Login success"));
+			}).get();
+	}
+	
+	private void grantAccess(HttpServletResponse response, User user) {
+		//generating access and refresh tokens 
+		String accessToken = jwtService.generateAccessToken(user.getUserName());
+		String refreshToken = jwtService.generateRefreshToken(user.getUserName());
+
+		//adding access and refresh tokens cookies to the response
+		response.addCookie(cookieManager.configure(new Cookie("at", accessToken), accessExpieryInSeconds));
+		response.addCookie(cookieManager.configure(new Cookie("rt", refreshToken), refreshExpieryInSeconds));
+		
+		//saving access and refresh cookies in the database
+		accessTockenRepository.save(AccessTocken.builder()
+				.token(accessToken)
+				.isBlocked(false)
+				.expiration(LocalDateTime.now().plusSeconds(accessExpieryInSeconds))
+				.build());
+		
+		refreshTockenRepository.save(RefreshTocken.builder()
+				.token(refreshToken)
+				.isBlocked(false)
+				.expiration(LocalDateTime.now().plusSeconds(refreshExpieryInSeconds))
+				.build());
+	}
+	
+	private void sendOtpToMail(User user, String otp) throws MessagingException {
 		sendMail(MessageStructure.builder()
 		.to(user.getEmail())
 		.subject("Complete your registration to flipkart")
@@ -176,7 +274,7 @@ public class AuthServiceImpl implements AuthService {
 
 		user.setUserName(userRequest.getEmail().split("@")[0]);
 		user.setEmail(userRequest.getEmail());
-		user.setPassword(userRequest.getPassword());
+		user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
 		user.setUserRole(userRequest.getUserRole());
 		return (T) user;
 	}
@@ -186,4 +284,7 @@ public class AuthServiceImpl implements AuthService {
 				.userRole(user.getUserRole()).build();
 
 	}
+
+
+ 
 }

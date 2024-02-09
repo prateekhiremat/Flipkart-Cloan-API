@@ -11,12 +11,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ecommerce.requestDTO.AuthRequest;
 import com.ecommerce.requestDTO.OtpModel;
 import com.ecommerce.requestDTO.UserRequest;
+import com.ecommerce.responseDTO.AuthResponse;
 import com.ecommerce.responseDTO.UserResponse;
 import com.ecommerce.service.AuthService;
 import com.ecommerce.util.ResponseStructure;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 
@@ -48,5 +51,10 @@ public class AuthController {
 	@PutMapping("/user/otp")
 	public ResponseEntity<ResponseStructure<UserResponse>> verifyOTP(@RequestBody  OtpModel otp){
 		return authservice.verifyOTP(otp);
+	}
+	
+	@PostMapping("/login")
+	public ResponseEntity<ResponseStructure<AuthResponse>> login(@RequestBody AuthRequest authRequest, HttpServletResponse response){
+		return authservice.login(authRequest, response);
 	}
 }
