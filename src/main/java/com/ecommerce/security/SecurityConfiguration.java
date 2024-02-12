@@ -1,40 +1,49 @@
 package com.ecommerce.security;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import lombok.AllArgsConstructor;
 
 @Configuration
 @EnableWebSecurity
+@AllArgsConstructor
 public class SecurityConfiguration {
-	@Autowired
+	
 	private  CustomUserDetailService userDetailService;
+	
+	private JwtFilter jwtFilter;
 
 	@Bean
 	PasswordEncoder passwordEncoder() {
 		return new BCryptPasswordEncoder(12);	
 	}
+
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
 		return http.csrf(csrf->csrf.disable())
 				.authorizeHttpRequests(auth -> auth.requestMatchers("/**")
-				.permitAll()
-				.anyRequest().authenticated())
+						.permitAll().anyRequest().authenticated())
+				.sessionManagement(management -> 
+				management.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+				.authenticationProvider(authenticationProvider())
+				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 //				.formLogin(Customizer.withDefaults()) //Session based authentication
-				.httpBasic(Customizer.withDefaults()) //Stateless authentication
+//				.httpBasic(Customizer.withDefaults()) //Stateless authentication
 				.build();
 	}
-	
+
 	@Bean
 	AuthenticationProvider authenticationProvider() {
 		DaoAuthenticationProvider provider=new DaoAuthenticationProvider();
@@ -42,7 +51,7 @@ public class SecurityConfiguration {
 		provider.setPasswordEncoder(passwordEncoder());
 		return provider;
 	}
-	
+
 	@Bean
 	AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
 		return configuration.getAuthenticationManager();

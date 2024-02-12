@@ -1,9 +1,11 @@
 package com.ecommerce.util;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import java.time.LocalDateTime;
+
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.ecommerce.repository.AccessTockenRepository;
 import com.ecommerce.repository.UserRepository;
 
 import jakarta.transaction.Transactional;
@@ -12,16 +14,21 @@ import lombok.AllArgsConstructor;
 @Component
 @AllArgsConstructor
 public class ScheduledJobes {
-	@Autowired
+	
 	private UserRepository userRepository;
-	@Scheduled(fixedDelay = 1000L*60)
+	
+	private AccessTockenRepository accessTockenRepository;
+	
+	@Scheduled(fixedDelay = 1000L*60*60)
 	@Transactional
 	public void delete() {
 		userRepository.findByIsDeleated(true).forEach(user -> {
-				userRepository.delete(user.get());
-		});
-		userRepository.findByIsEmailVarified(true).forEach(user -> {
 			userRepository.delete(user.get());
-	});
+		});
+		accessTockenRepository.findAllByExpirationBefore(LocalDateTime.now()).forEach(tocken -> {
+			if(tocken.get().getExpiration().isEqual(LocalDateTime.now()) ||
+					tocken.get().getExpiration().isBefore(LocalDateTime.now()))
+				accessTockenRepository.delete(tocken.get());
+		});
 	}
 }

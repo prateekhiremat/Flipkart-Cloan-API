@@ -18,6 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import com.ecommerce.exception.InvalidOtpException;
 import com.ecommerce.exception.OTPExpiredException;
 import com.ecommerce.exception.RegistrationExpiredException;
+import com.ecommerce.exception.UserNotLoggedInException;
 
 @RestControllerAdvice
 public class ApplicationHandler extends ResponseEntityExceptionHandler {
@@ -55,6 +56,10 @@ public class ApplicationHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler (RegistrationExpiredException.class)
 	public ResponseEntity<Object> handlerRegistrationExpired(RegistrationExpiredException ex){
 		return structure(HttpStatus.BAD_REQUEST,ex.getMessage(),"User time out");
+	}
+	@ExceptionHandler (UserNotLoggedInException.class)
+	public ResponseEntity<Object> handlerUserNotLoggedIn(UserNotLoggedInException ex){
+		return structure(HttpStatus.BAD_REQUEST,ex.getMessage(),"User Not Logged In");
 	}
 	
 }
