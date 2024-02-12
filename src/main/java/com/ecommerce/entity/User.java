@@ -48,10 +48,4 @@ public class User {
 	private UserRole userRole;
 	private boolean isEmailVarified;
 	private boolean isDeleated;
-	
-	@OneToMany
-	private List<AccessTocken> accessTockens;
-	
-	@OneToMany
-	private List<RefreshTocken> refreshTockens;
 }
