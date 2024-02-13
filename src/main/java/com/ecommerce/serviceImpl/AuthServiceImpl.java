@@ -30,6 +30,7 @@ import com.ecommerce.entity.User;
 import com.ecommerce.exception.InvalidOtpException;
 import com.ecommerce.exception.OTPExpiredException;
 import com.ecommerce.exception.RegistrationExpiredException;
+import com.ecommerce.exception.UserAlreadyLoggedInException;
 import com.ecommerce.exception.UserNotLoggedInException;
 import com.ecommerce.repository.AccessTockenRepository;
 import com.ecommerce.repository.RefreshTockenRepository;
@@ -254,10 +255,32 @@ public class AuthServiceImpl implements AuthService {
 				blockAccessToken(accessTockens);
 				List<RefreshTocken> refreshTockens = refreshTockenRepository.findAllByUserAndIsBlockedAndTokenNot(user, false, refreshToken);
 				blockRefreshToken(refreshTockens);
-			});;
+			});
 		}
 		return new ResponseEntity<SimpleResponseStructure>(SimpleResponseStructure.builder()
 				.status(HttpStatus.OK.value()).message("Logged Out from other device Successfully").build(), HttpStatus.OK);
+	}
+
+	public ResponseEntity<SimpleResponseStructure> refreshLogin(String accessToken, String refreshToken, HttpServletResponse response){
+		String name = SecurityContextHolder.getContext().getAuthentication().getName();
+		if(name=="anonymousUser")throw new UserNotLoggedInException("Please login first");
+			userRepository.findByUserName(name).ifPresent(user -> {
+				if(user!=null) {
+					List<AccessTocken> accessTockens = accessTockenRepository.findAllByUserAndIsBlocked(user, false);
+					if(accessTockens!=null) {
+						blockAccessToken(accessTockens);
+					} 
+					List<RefreshTocken> refreshTockens = refreshTockenRepository.findAllByUserAndIsBlocked(user, false);
+					if(refreshTockens==null) throw new UserNotLoggedInException("Please relogin!!!");
+					else {
+						blockRefreshToken(refreshTockens);
+						grantAccess(response, user);
+					}
+				}
+			});
+
+		return new ResponseEntity<SimpleResponseStructure>(SimpleResponseStructure.builder()
+				.status(HttpStatus.OK.value()).message("re-logged in").build(), HttpStatus.OK);	
 	}
 
 	private void blockAccessToken(List<AccessTocken> accessTocken) {
@@ -282,26 +305,25 @@ public class AuthServiceImpl implements AuthService {
 		//adding access and refresh tokens cookies to the response
 		response.addCookie(cookieManager.configure(new Cookie("at", accessToken), accessExpieryInSeconds));
 		response.addCookie(cookieManager.configure(new Cookie("rt", refreshToken), refreshExpieryInSeconds));
-
-			//saving access and refresh cookies in the database
-		if(accessTockenRepository.existsByUser(user)==false && refreshTockenRepository.existsByUser(user)==false) {
+		//saving access and refresh cookies in the database
+		if(!accessTockenRepository.existsByUserAndIsBlocked(user, false) && 
+				!refreshTockenRepository.existsByUserAndIsBlocked(user, false)) {
 			accessTockenRepository.save(AccessTocken.builder()
 					.token(accessToken)
 					.isBlocked(false)
 					.user(user)
 					.expiration(LocalDateTime.now().plusSeconds(accessExpieryInSeconds))
 					.build());
-			
+
 			refreshTockenRepository.save(RefreshTocken.builder()
 					.token(refreshToken)
 					.isBlocked(false)
 					.user(user)
 					.expiration(LocalDateTime.now().plusSeconds(refreshExpieryInSeconds))
 					.build());
-			}
-			
+		}else throw new UserAlreadyLoggedInException("You are already loggid in !!!");
 	}
-	
+
 	private void sendOtpToMail(User user, String otp) throws MessagingException {
 		sendMail(MessageStructure.builder()
 				.to(user.getEmail())
