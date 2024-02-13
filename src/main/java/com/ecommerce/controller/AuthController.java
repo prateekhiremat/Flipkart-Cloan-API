@@ -85,4 +85,11 @@ public class AuthController {
 			@CookieValue(name = "rt", required = false)String refreshToken){
 		return authservice.logoutFromOtherDevice(accessToken, refreshToken);
 	}
+	
+	@PreAuthorize(value = "hasAuthority('SELLER') or hasAuthority('CUSTOMER')")
+	@PostMapping("user/refresh-login")
+	public ResponseEntity<SimpleResponseStructure> refreshLogin(@CookieValue(name = "at", required = false)String accessToken, 
+			@CookieValue(name = "rt", required = false)String refreshToken, HttpServletResponse response){
+		return authservice.refreshLogin(accessToken, refreshToken, response);
+	}
 }

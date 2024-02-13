@@ -32,4 +32,6 @@ public interface AuthService {
 
 	public ResponseEntity<SimpleResponseStructure> logoutFromOtherDevice(String accessToken, String refreshToken);
 
+	public ResponseEntity<SimpleResponseStructure> refreshLogin(String accessToken, String refreshToken, HttpServletResponse response);
+
 }

@@ -25,5 +25,7 @@ public interface RefreshTockenRepository extends JpaRepository<RefreshTocken, Lo
 	public List<RefreshTocken> findAllByUserAndIsBlockedAndTokenNot(User user, boolean b, String refreshToken);
 	
 	public boolean existsByUser(User user);
+
+	public boolean existsByUserAndIsBlocked(User user, boolean b);
 	
 }
